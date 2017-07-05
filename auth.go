@@ -12,25 +12,16 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-type AuthRequest struct {
-	Token string `json:"authToken"`
+func (a *App) registerAuthHandlers(mux *http.ServeMux) {
+	mux.HandleFunc("/auth/google", a.handleGoogleAuth)
 }
 
-func (a App) handleAuth(w http.ResponseWriter, r *http.Request) {
+func (a App) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	log.Print("Google Sign-in authentication request")
 
-	if r.Body == nil {
-		log.Print("Request body was empty")
-		http.Error(w, "Request body empty", http.StatusBadRequest)
-		return
-	}
+	var authRequest AuthTokenRequest
 
-	var authRequest AuthRequest
-
-	err := json.NewDecoder(r.Body).Decode(&authRequest)
-	if err != nil {
-		log.Print("Failed to decode the JSON request body:", err)
-		http.Error(w, "Failed to decode JSON", http.StatusBadRequest)
+	if err := decodeJSON(w, r, &authRequest); err != nil {
 		return
 	}
 
@@ -83,5 +74,19 @@ func (a App) handleAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(AuthRequest{token})
+	json.NewEncoder(w).Encode(AuthTokenRequest{token})
+}
+
+func (a *App) verifyAuthToken(token string) (*models.User, error) {
+	t, err := models.FindAuthToken(a.DB, token)
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := t.User(a.DB).One()
+	if err != nil {
+		return nil, err
+	}
+
+	return u, nil
 }

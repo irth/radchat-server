@@ -16,7 +16,7 @@ import (
 )
 
 type App struct {
-	DB *sql.DB
+	DB       *sql.DB
 	Verifier *googleVerifier.Verifier
 }
 
@@ -38,7 +38,10 @@ func main() {
 	app.Verifier.FetchKeys()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/auth/google", app.handleAuth)
+
+	app.registerAuthHandlers(mux)
+	app.registerProfileHandlers(mux)
+	app.registerWebsocketHandlers(mux)
 
 	handler := cors.Default().Handler(mux)
 
