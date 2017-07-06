@@ -1,0 +1,5 @@
+development:
+  dialect: postgres
+  datasource: password=mysecretpassword sslmode=disable user=postgres
+  dir: migrations
+  table: migrations

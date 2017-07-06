@@ -1,3 +1,4 @@
+-- +migrate Up
 CREATE TABLE users (
   id serial primary key not null,
   display_name VARCHAR not null
@@ -18,3 +19,9 @@ CREATE TABLE friendships (
   user_id INTEGER REFERENCES users,
   friend_id INTEGER REFERENCES users
 );
+
+-- +migrate Down
+DROP TABLE friendships;
+DROP TABLE remote_users;
+DROP TABLE auth_tokens;
+DROP TABLE users;

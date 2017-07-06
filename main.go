@@ -1,6 +1,6 @@
 package main
 
-//go:generate sqlboiler --wipe postgres
+//go:generate sqlboiler -b migrations --wipe postgres
 
 import (
 	"flag"

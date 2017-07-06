@@ -29,7 +29,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, i interface{}) error {
 }
 
 type AuthTokenRequest struct {
-	Token string `json:"authToken"`
+	Token string `json:"auth_token"`
 }
 
 func (a *App) requireUser(w http.ResponseWriter, r *http.Request) (*models.User, error) {

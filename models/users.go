@@ -18,12 +18,14 @@ import (
 	"github.com/vattle/sqlboiler/queries"
 	"github.com/vattle/sqlboiler/queries/qm"
 	"github.com/vattle/sqlboiler/strmangle"
+	"gopkg.in/nullbio/null.v6"
 )
 
 // User is an object representing the database table.
 type User struct {
-	ID          int    `boil:"id" json:"id" toml:"id" yaml:"id"`
-	DisplayName string `boil:"display_name" json:"display_name" toml:"display_name" yaml:"display_name"`
+	ID          int         `boil:"id" json:"id" toml:"id" yaml:"id"`
+	DisplayName string      `boil:"display_name" json:"display_name" toml:"display_name" yaml:"display_name"`
+	Username    null.String `boil:"username" json:"username,omitempty" toml:"username" yaml:"username,omitempty"`
 
 	R *userR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L userL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -32,9 +34,11 @@ type User struct {
 var UserColumns = struct {
 	ID          string
 	DisplayName string
+	Username    string
 }{
 	ID:          "id",
 	DisplayName: "display_name",
+	Username:    "username",
 }
 
 // userR is where relationships are stored.
@@ -49,8 +53,8 @@ type userR struct {
 type userL struct{}
 
 var (
-	userColumns               = []string{"id", "display_name"}
-	userColumnsWithoutDefault = []string{"display_name"}
+	userColumns               = []string{"id", "display_name", "username"}
+	userColumnsWithoutDefault = []string{"display_name", "username"}
 	userColumnsWithDefault    = []string{"id"}
 	userPrimaryKeyColumns     = []string{"id"}
 )

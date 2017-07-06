@@ -16,6 +16,12 @@ func (a *App) registerAuthHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/auth/google", a.handleGoogleAuth)
 }
 
+type AuthTokenResponse struct {
+	Token     string       `json:"auth_token"`
+	User      *models.User `json:"user"`
+	FirstTime bool         `json:"first_time"`
+}
+
 func (a App) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	log.Print("Google Sign-in authentication request")
 
@@ -74,7 +80,7 @@ func (a App) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(AuthTokenRequest{token})
+	json.NewEncoder(w).Encode(AuthTokenResponse{token, u, u.Username.IsZero()})
 }
 
 func (a *App) verifyAuthToken(token string) (*models.User, error) {
