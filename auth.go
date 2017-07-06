@@ -35,7 +35,7 @@ func (a App) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 
 	if googleAuthToken == nil || err != nil {
 		// token is invalid
-		http.Error(w, fmt.Sprint("Invalid token: ", err.Error()), http.StatusUnauthorized)
+		errorResponse(w, fmt.Sprint("Invalid token: ", err.Error()), http.StatusUnauthorized)
 		return
 	}
 
@@ -51,24 +51,24 @@ func (a App) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 
 		err := ru.SetUser(a.DB, true, u)
 		if err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
+			errorResponse(w, "Database error", http.StatusInternalServerError)
 			return
 		}
 
 		err = ru.Insert(a.DB)
 		if err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
+			errorResponse(w, "Database error", http.StatusInternalServerError)
 			return
 		}
 	} else {
 		if err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
+			errorResponse(w, "Database error", http.StatusInternalServerError)
 			return
 		}
 
 		u, err = ru.User(a.DB).One()
 		if err != nil {
-			http.Error(w, "Couldn't find the user", http.StatusUnauthorized)
+			errorResponse(w, "Couldn't find the user", http.StatusUnauthorized)
 			return
 		}
 	}
@@ -76,7 +76,7 @@ func (a App) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	token := uuid.NewV4().String()
 	err = u.AddAuthTokens(a.DB, true, &models.AuthToken{Token: token})
 	if err != nil {
-		http.Error(w, "Couldn't create a token", http.StatusInternalServerError)
+		errorResponse(w, "Couldn't create a token", http.StatusInternalServerError)
 		return
 	}
 
