@@ -1,6 +1,6 @@
 package main
 
-//go:generate sqlboiler postgres
+//go:generate sqlboiler --wipe postgres
 
 import (
 	"flag"
@@ -18,6 +18,7 @@ import (
 type App struct {
 	DB       *sql.DB
 	Verifier *googleVerifier.Verifier
+	Hub      *Hub
 }
 
 func main() {
@@ -33,7 +34,10 @@ func main() {
 	app := App{
 		db,
 		&googleVerifier.Verifier{ClientID: "41009918331-5jiap87h9iaaag4qi597siluelvq3706.apps.googleusercontent.com"},
+		newHub(),
 	}
+
+	go app.Hub.Run()
 
 	app.Verifier.FetchKeys()
 

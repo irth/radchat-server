@@ -39,8 +39,10 @@ var UserColumns = struct {
 
 // userR is where relationships are stored.
 type userR struct {
-	AuthTokens  AuthTokenSlice
-	RemoteUsers RemoteUserSlice
+	AuthTokens        AuthTokenSlice
+	Friendships       FriendshipSlice
+	FriendFriendships FriendshipSlice
+	RemoteUsers       RemoteUserSlice
 }
 
 // userL is where Load methods for each relationship are stored.
@@ -355,6 +357,58 @@ func (o *User) AuthTokens(exec boil.Executor, mods ...qm.QueryMod) authTokenQuer
 	return query
 }
 
+// FriendshipsG retrieves all the friendship's friendships.
+func (o *User) FriendshipsG(mods ...qm.QueryMod) friendshipQuery {
+	return o.Friendships(boil.GetDB(), mods...)
+}
+
+// Friendships retrieves all the friendship's friendships with an executor.
+func (o *User) Friendships(exec boil.Executor, mods ...qm.QueryMod) friendshipQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"friendships\".\"user_id\"=?", o.ID),
+	)
+
+	query := Friendships(exec, queryMods...)
+	queries.SetFrom(query.Query, "\"friendships\"")
+
+	if len(queries.GetSelect(query.Query)) == 0 {
+		queries.SetSelect(query.Query, []string{"\"friendships\".*"})
+	}
+
+	return query
+}
+
+// FriendFriendshipsG retrieves all the friendship's friendships via friend_id column.
+func (o *User) FriendFriendshipsG(mods ...qm.QueryMod) friendshipQuery {
+	return o.FriendFriendships(boil.GetDB(), mods...)
+}
+
+// FriendFriendships retrieves all the friendship's friendships with an executor via friend_id column.
+func (o *User) FriendFriendships(exec boil.Executor, mods ...qm.QueryMod) friendshipQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"friendships\".\"friend_id\"=?", o.ID),
+	)
+
+	query := Friendships(exec, queryMods...)
+	queries.SetFrom(query.Query, "\"friendships\"")
+
+	if len(queries.GetSelect(query.Query)) == 0 {
+		queries.SetSelect(query.Query, []string{"\"friendships\".*"})
+	}
+
+	return query
+}
+
 // RemoteUsersG retrieves all the remote_user's remote users.
 func (o *User) RemoteUsersG(mods ...qm.QueryMod) remoteUserQuery {
 	return o.RemoteUsers(boil.GetDB(), mods...)
@@ -445,6 +499,150 @@ func (userL) LoadAuthTokens(e boil.Executor, singular bool, maybeUser interface{
 		for _, local := range slice {
 			if local.ID == foreign.UserID.Int {
 				local.R.AuthTokens = append(local.R.AuthTokens, foreign)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadFriendships allows an eager lookup of values, cached into the
+// loaded structs of the objects.
+func (userL) LoadFriendships(e boil.Executor, singular bool, maybeUser interface{}) error {
+	var slice []*User
+	var object *User
+
+	count := 1
+	if singular {
+		object = maybeUser.(*User)
+	} else {
+		slice = *maybeUser.(*[]*User)
+		count = len(slice)
+	}
+
+	args := make([]interface{}, count)
+	if singular {
+		if object.R == nil {
+			object.R = &userR{}
+		}
+		args[0] = object.ID
+	} else {
+		for i, obj := range slice {
+			if obj.R == nil {
+				obj.R = &userR{}
+			}
+			args[i] = obj.ID
+		}
+	}
+
+	query := fmt.Sprintf(
+		"select * from \"friendships\" where \"user_id\" in (%s)",
+		strmangle.Placeholders(dialect.IndexPlaceholders, count, 1, 1),
+	)
+	if boil.DebugMode {
+		fmt.Fprintf(boil.DebugWriter, "%s\n%v\n", query, args)
+	}
+
+	results, err := e.Query(query, args...)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load friendships")
+	}
+	defer results.Close()
+
+	var resultSlice []*Friendship
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice friendships")
+	}
+
+	if len(friendshipAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.Friendships = resultSlice
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if local.ID == foreign.UserID.Int {
+				local.R.Friendships = append(local.R.Friendships, foreign)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadFriendFriendships allows an eager lookup of values, cached into the
+// loaded structs of the objects.
+func (userL) LoadFriendFriendships(e boil.Executor, singular bool, maybeUser interface{}) error {
+	var slice []*User
+	var object *User
+
+	count := 1
+	if singular {
+		object = maybeUser.(*User)
+	} else {
+		slice = *maybeUser.(*[]*User)
+		count = len(slice)
+	}
+
+	args := make([]interface{}, count)
+	if singular {
+		if object.R == nil {
+			object.R = &userR{}
+		}
+		args[0] = object.ID
+	} else {
+		for i, obj := range slice {
+			if obj.R == nil {
+				obj.R = &userR{}
+			}
+			args[i] = obj.ID
+		}
+	}
+
+	query := fmt.Sprintf(
+		"select * from \"friendships\" where \"friend_id\" in (%s)",
+		strmangle.Placeholders(dialect.IndexPlaceholders, count, 1, 1),
+	)
+	if boil.DebugMode {
+		fmt.Fprintf(boil.DebugWriter, "%s\n%v\n", query, args)
+	}
+
+	results, err := e.Query(query, args...)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load friendships")
+	}
+	defer results.Close()
+
+	var resultSlice []*Friendship
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice friendships")
+	}
+
+	if len(friendshipAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.FriendFriendships = resultSlice
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if local.ID == foreign.FriendID.Int {
+				local.R.FriendFriendships = append(local.R.FriendFriendships, foreign)
 				break
 			}
 		}
@@ -739,6 +937,448 @@ func (o *User) RemoveAuthTokens(exec boil.Executor, related ...*AuthToken) error
 				o.R.AuthTokens[i] = o.R.AuthTokens[ln-1]
 			}
 			o.R.AuthTokens = o.R.AuthTokens[:ln-1]
+			break
+		}
+	}
+
+	return nil
+}
+
+// AddFriendshipsG adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.Friendships.
+// Sets related.R.User appropriately.
+// Uses the global database handle.
+func (o *User) AddFriendshipsG(insert bool, related ...*Friendship) error {
+	return o.AddFriendships(boil.GetDB(), insert, related...)
+}
+
+// AddFriendshipsP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.Friendships.
+// Sets related.R.User appropriately.
+// Panics on error.
+func (o *User) AddFriendshipsP(exec boil.Executor, insert bool, related ...*Friendship) {
+	if err := o.AddFriendships(exec, insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddFriendshipsGP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.Friendships.
+// Sets related.R.User appropriately.
+// Uses the global database handle and panics on error.
+func (o *User) AddFriendshipsGP(insert bool, related ...*Friendship) {
+	if err := o.AddFriendships(boil.GetDB(), insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddFriendships adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.Friendships.
+// Sets related.R.User appropriately.
+func (o *User) AddFriendships(exec boil.Executor, insert bool, related ...*Friendship) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			rel.UserID.Int = o.ID
+			rel.UserID.Valid = true
+			if err = rel.Insert(exec); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"friendships\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"user_id"}),
+				strmangle.WhereClause("\"", "\"", 2, friendshipPrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.DebugMode {
+				fmt.Fprintln(boil.DebugWriter, updateQuery)
+				fmt.Fprintln(boil.DebugWriter, values)
+			}
+
+			if _, err = exec.Exec(updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			rel.UserID.Int = o.ID
+			rel.UserID.Valid = true
+		}
+	}
+
+	if o.R == nil {
+		o.R = &userR{
+			Friendships: related,
+		}
+	} else {
+		o.R.Friendships = append(o.R.Friendships, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &friendshipR{
+				User: o,
+			}
+		} else {
+			rel.R.User = o
+		}
+	}
+	return nil
+}
+
+// SetFriendshipsG removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.User's Friendships accordingly.
+// Replaces o.R.Friendships with related.
+// Sets related.R.User's Friendships accordingly.
+// Uses the global database handle.
+func (o *User) SetFriendshipsG(insert bool, related ...*Friendship) error {
+	return o.SetFriendships(boil.GetDB(), insert, related...)
+}
+
+// SetFriendshipsP removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.User's Friendships accordingly.
+// Replaces o.R.Friendships with related.
+// Sets related.R.User's Friendships accordingly.
+// Panics on error.
+func (o *User) SetFriendshipsP(exec boil.Executor, insert bool, related ...*Friendship) {
+	if err := o.SetFriendships(exec, insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// SetFriendshipsGP removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.User's Friendships accordingly.
+// Replaces o.R.Friendships with related.
+// Sets related.R.User's Friendships accordingly.
+// Uses the global database handle and panics on error.
+func (o *User) SetFriendshipsGP(insert bool, related ...*Friendship) {
+	if err := o.SetFriendships(boil.GetDB(), insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// SetFriendships removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.User's Friendships accordingly.
+// Replaces o.R.Friendships with related.
+// Sets related.R.User's Friendships accordingly.
+func (o *User) SetFriendships(exec boil.Executor, insert bool, related ...*Friendship) error {
+	query := "update \"friendships\" set \"user_id\" = null where \"user_id\" = $1"
+	values := []interface{}{o.ID}
+	if boil.DebugMode {
+		fmt.Fprintln(boil.DebugWriter, query)
+		fmt.Fprintln(boil.DebugWriter, values)
+	}
+
+	_, err := exec.Exec(query, values...)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove relationships before set")
+	}
+
+	if o.R != nil {
+		for _, rel := range o.R.Friendships {
+			rel.UserID.Valid = false
+			if rel.R == nil {
+				continue
+			}
+
+			rel.R.User = nil
+		}
+
+		o.R.Friendships = nil
+	}
+	return o.AddFriendships(exec, insert, related...)
+}
+
+// RemoveFriendshipsG relationships from objects passed in.
+// Removes related items from R.Friendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.User.
+// Uses the global database handle.
+func (o *User) RemoveFriendshipsG(related ...*Friendship) error {
+	return o.RemoveFriendships(boil.GetDB(), related...)
+}
+
+// RemoveFriendshipsP relationships from objects passed in.
+// Removes related items from R.Friendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.User.
+// Panics on error.
+func (o *User) RemoveFriendshipsP(exec boil.Executor, related ...*Friendship) {
+	if err := o.RemoveFriendships(exec, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// RemoveFriendshipsGP relationships from objects passed in.
+// Removes related items from R.Friendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.User.
+// Uses the global database handle and panics on error.
+func (o *User) RemoveFriendshipsGP(related ...*Friendship) {
+	if err := o.RemoveFriendships(boil.GetDB(), related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// RemoveFriendships relationships from objects passed in.
+// Removes related items from R.Friendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.User.
+func (o *User) RemoveFriendships(exec boil.Executor, related ...*Friendship) error {
+	var err error
+	for _, rel := range related {
+		rel.UserID.Valid = false
+		if rel.R != nil {
+			rel.R.User = nil
+		}
+		if err = rel.Update(exec, "user_id"); err != nil {
+			return err
+		}
+	}
+	if o.R == nil {
+		return nil
+	}
+
+	for _, rel := range related {
+		for i, ri := range o.R.Friendships {
+			if rel != ri {
+				continue
+			}
+
+			ln := len(o.R.Friendships)
+			if ln > 1 && i < ln-1 {
+				o.R.Friendships[i] = o.R.Friendships[ln-1]
+			}
+			o.R.Friendships = o.R.Friendships[:ln-1]
+			break
+		}
+	}
+
+	return nil
+}
+
+// AddFriendFriendshipsG adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.FriendFriendships.
+// Sets related.R.Friend appropriately.
+// Uses the global database handle.
+func (o *User) AddFriendFriendshipsG(insert bool, related ...*Friendship) error {
+	return o.AddFriendFriendships(boil.GetDB(), insert, related...)
+}
+
+// AddFriendFriendshipsP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.FriendFriendships.
+// Sets related.R.Friend appropriately.
+// Panics on error.
+func (o *User) AddFriendFriendshipsP(exec boil.Executor, insert bool, related ...*Friendship) {
+	if err := o.AddFriendFriendships(exec, insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddFriendFriendshipsGP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.FriendFriendships.
+// Sets related.R.Friend appropriately.
+// Uses the global database handle and panics on error.
+func (o *User) AddFriendFriendshipsGP(insert bool, related ...*Friendship) {
+	if err := o.AddFriendFriendships(boil.GetDB(), insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddFriendFriendships adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.FriendFriendships.
+// Sets related.R.Friend appropriately.
+func (o *User) AddFriendFriendships(exec boil.Executor, insert bool, related ...*Friendship) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			rel.FriendID.Int = o.ID
+			rel.FriendID.Valid = true
+			if err = rel.Insert(exec); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"friendships\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"friend_id"}),
+				strmangle.WhereClause("\"", "\"", 2, friendshipPrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.DebugMode {
+				fmt.Fprintln(boil.DebugWriter, updateQuery)
+				fmt.Fprintln(boil.DebugWriter, values)
+			}
+
+			if _, err = exec.Exec(updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			rel.FriendID.Int = o.ID
+			rel.FriendID.Valid = true
+		}
+	}
+
+	if o.R == nil {
+		o.R = &userR{
+			FriendFriendships: related,
+		}
+	} else {
+		o.R.FriendFriendships = append(o.R.FriendFriendships, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &friendshipR{
+				Friend: o,
+			}
+		} else {
+			rel.R.Friend = o
+		}
+	}
+	return nil
+}
+
+// SetFriendFriendshipsG removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Friend's FriendFriendships accordingly.
+// Replaces o.R.FriendFriendships with related.
+// Sets related.R.Friend's FriendFriendships accordingly.
+// Uses the global database handle.
+func (o *User) SetFriendFriendshipsG(insert bool, related ...*Friendship) error {
+	return o.SetFriendFriendships(boil.GetDB(), insert, related...)
+}
+
+// SetFriendFriendshipsP removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Friend's FriendFriendships accordingly.
+// Replaces o.R.FriendFriendships with related.
+// Sets related.R.Friend's FriendFriendships accordingly.
+// Panics on error.
+func (o *User) SetFriendFriendshipsP(exec boil.Executor, insert bool, related ...*Friendship) {
+	if err := o.SetFriendFriendships(exec, insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// SetFriendFriendshipsGP removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Friend's FriendFriendships accordingly.
+// Replaces o.R.FriendFriendships with related.
+// Sets related.R.Friend's FriendFriendships accordingly.
+// Uses the global database handle and panics on error.
+func (o *User) SetFriendFriendshipsGP(insert bool, related ...*Friendship) {
+	if err := o.SetFriendFriendships(boil.GetDB(), insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// SetFriendFriendships removes all previously related items of the
+// user replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Friend's FriendFriendships accordingly.
+// Replaces o.R.FriendFriendships with related.
+// Sets related.R.Friend's FriendFriendships accordingly.
+func (o *User) SetFriendFriendships(exec boil.Executor, insert bool, related ...*Friendship) error {
+	query := "update \"friendships\" set \"friend_id\" = null where \"friend_id\" = $1"
+	values := []interface{}{o.ID}
+	if boil.DebugMode {
+		fmt.Fprintln(boil.DebugWriter, query)
+		fmt.Fprintln(boil.DebugWriter, values)
+	}
+
+	_, err := exec.Exec(query, values...)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove relationships before set")
+	}
+
+	if o.R != nil {
+		for _, rel := range o.R.FriendFriendships {
+			rel.FriendID.Valid = false
+			if rel.R == nil {
+				continue
+			}
+
+			rel.R.Friend = nil
+		}
+
+		o.R.FriendFriendships = nil
+	}
+	return o.AddFriendFriendships(exec, insert, related...)
+}
+
+// RemoveFriendFriendshipsG relationships from objects passed in.
+// Removes related items from R.FriendFriendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.Friend.
+// Uses the global database handle.
+func (o *User) RemoveFriendFriendshipsG(related ...*Friendship) error {
+	return o.RemoveFriendFriendships(boil.GetDB(), related...)
+}
+
+// RemoveFriendFriendshipsP relationships from objects passed in.
+// Removes related items from R.FriendFriendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.Friend.
+// Panics on error.
+func (o *User) RemoveFriendFriendshipsP(exec boil.Executor, related ...*Friendship) {
+	if err := o.RemoveFriendFriendships(exec, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// RemoveFriendFriendshipsGP relationships from objects passed in.
+// Removes related items from R.FriendFriendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.Friend.
+// Uses the global database handle and panics on error.
+func (o *User) RemoveFriendFriendshipsGP(related ...*Friendship) {
+	if err := o.RemoveFriendFriendships(boil.GetDB(), related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// RemoveFriendFriendships relationships from objects passed in.
+// Removes related items from R.FriendFriendships (uses pointer comparison, removal does not keep order)
+// Sets related.R.Friend.
+func (o *User) RemoveFriendFriendships(exec boil.Executor, related ...*Friendship) error {
+	var err error
+	for _, rel := range related {
+		rel.FriendID.Valid = false
+		if rel.R != nil {
+			rel.R.Friend = nil
+		}
+		if err = rel.Update(exec, "friend_id"); err != nil {
+			return err
+		}
+	}
+	if o.R == nil {
+		return nil
+	}
+
+	for _, rel := range related {
+		for i, ri := range o.R.FriendFriendships {
+			if rel != ri {
+				continue
+			}
+
+			ln := len(o.R.FriendFriendships)
+			if ln > 1 && i < ln-1 {
+				o.R.FriendFriendships[i] = o.R.FriendFriendships[ln-1]
+			}
+			o.R.FriendFriendships = o.R.FriendFriendships[:ln-1]
 			break
 		}
 	}

@@ -14,66 +14,77 @@ import "testing"
 // Separating the tests thusly grants avoidance of Postgres deadlocks.
 func TestParent(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokens)
+	t.Run("Friendships", testFriendships)
 	t.Run("RemoteUsers", testRemoteUsers)
 	t.Run("Users", testUsers)
 }
 
 func TestDelete(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensDelete)
+	t.Run("Friendships", testFriendshipsDelete)
 	t.Run("RemoteUsers", testRemoteUsersDelete)
 	t.Run("Users", testUsersDelete)
 }
 
 func TestQueryDeleteAll(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensQueryDeleteAll)
+	t.Run("Friendships", testFriendshipsQueryDeleteAll)
 	t.Run("RemoteUsers", testRemoteUsersQueryDeleteAll)
 	t.Run("Users", testUsersQueryDeleteAll)
 }
 
 func TestSliceDeleteAll(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensSliceDeleteAll)
+	t.Run("Friendships", testFriendshipsSliceDeleteAll)
 	t.Run("RemoteUsers", testRemoteUsersSliceDeleteAll)
 	t.Run("Users", testUsersSliceDeleteAll)
 }
 
 func TestExists(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensExists)
+	t.Run("Friendships", testFriendshipsExists)
 	t.Run("RemoteUsers", testRemoteUsersExists)
 	t.Run("Users", testUsersExists)
 }
 
 func TestFind(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensFind)
+	t.Run("Friendships", testFriendshipsFind)
 	t.Run("RemoteUsers", testRemoteUsersFind)
 	t.Run("Users", testUsersFind)
 }
 
 func TestBind(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensBind)
+	t.Run("Friendships", testFriendshipsBind)
 	t.Run("RemoteUsers", testRemoteUsersBind)
 	t.Run("Users", testUsersBind)
 }
 
 func TestOne(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensOne)
+	t.Run("Friendships", testFriendshipsOne)
 	t.Run("RemoteUsers", testRemoteUsersOne)
 	t.Run("Users", testUsersOne)
 }
 
 func TestAll(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensAll)
+	t.Run("Friendships", testFriendshipsAll)
 	t.Run("RemoteUsers", testRemoteUsersAll)
 	t.Run("Users", testUsersAll)
 }
 
 func TestCount(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensCount)
+	t.Run("Friendships", testFriendshipsCount)
 	t.Run("RemoteUsers", testRemoteUsersCount)
 	t.Run("Users", testUsersCount)
 }
 
 func TestHooks(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensHooks)
+	t.Run("Friendships", testFriendshipsHooks)
 	t.Run("RemoteUsers", testRemoteUsersHooks)
 	t.Run("Users", testUsersHooks)
 }
@@ -81,6 +92,8 @@ func TestHooks(t *testing.T) {
 func TestInsert(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensInsert)
 	t.Run("AuthTokens", testAuthTokensInsertWhitelist)
+	t.Run("Friendships", testFriendshipsInsert)
+	t.Run("Friendships", testFriendshipsInsertWhitelist)
 	t.Run("RemoteUsers", testRemoteUsersInsert)
 	t.Run("RemoteUsers", testRemoteUsersInsertWhitelist)
 	t.Run("Users", testUsersInsert)
@@ -91,6 +104,8 @@ func TestInsert(t *testing.T) {
 // or deadlocks can occur.
 func TestToOne(t *testing.T) {
 	t.Run("AuthTokenToUserUsingUser", testAuthTokenToOneUserUsingUser)
+	t.Run("FriendshipToUserUsingUser", testFriendshipToOneUserUsingUser)
+	t.Run("FriendshipToUserUsingFriend", testFriendshipToOneUserUsingFriend)
 	t.Run("RemoteUserToUserUsingUser", testRemoteUserToOneUserUsingUser)
 }
 
@@ -102,6 +117,8 @@ func TestOneToOne(t *testing.T) {}
 // or deadlocks can occur.
 func TestToMany(t *testing.T) {
 	t.Run("UserToAuthTokens", testUserToManyAuthTokens)
+	t.Run("UserToFriendships", testUserToManyFriendships)
+	t.Run("UserToFriendFriendships", testUserToManyFriendFriendships)
 	t.Run("UserToRemoteUsers", testUserToManyRemoteUsers)
 }
 
@@ -109,6 +126,8 @@ func TestToMany(t *testing.T) {
 // or deadlocks can occur.
 func TestToOneSet(t *testing.T) {
 	t.Run("AuthTokenToUserUsingUser", testAuthTokenToOneSetOpUserUsingUser)
+	t.Run("FriendshipToUserUsingUser", testFriendshipToOneSetOpUserUsingUser)
+	t.Run("FriendshipToUserUsingFriend", testFriendshipToOneSetOpUserUsingFriend)
 	t.Run("RemoteUserToUserUsingUser", testRemoteUserToOneSetOpUserUsingUser)
 }
 
@@ -116,6 +135,8 @@ func TestToOneSet(t *testing.T) {
 // or deadlocks can occur.
 func TestToOneRemove(t *testing.T) {
 	t.Run("AuthTokenToUserUsingUser", testAuthTokenToOneRemoveOpUserUsingUser)
+	t.Run("FriendshipToUserUsingUser", testFriendshipToOneRemoveOpUserUsingUser)
+	t.Run("FriendshipToUserUsingFriend", testFriendshipToOneRemoveOpUserUsingFriend)
 	t.Run("RemoteUserToUserUsingUser", testRemoteUserToOneRemoveOpUserUsingUser)
 }
 
@@ -131,6 +152,8 @@ func TestOneToOneRemove(t *testing.T) {}
 // or deadlocks can occur.
 func TestToManyAdd(t *testing.T) {
 	t.Run("UserToAuthTokens", testUserToManyAddOpAuthTokens)
+	t.Run("UserToFriendships", testUserToManyAddOpFriendships)
+	t.Run("UserToFriendFriendships", testUserToManyAddOpFriendFriendships)
 	t.Run("UserToRemoteUsers", testUserToManyAddOpRemoteUsers)
 }
 
@@ -138,6 +161,8 @@ func TestToManyAdd(t *testing.T) {
 // or deadlocks can occur.
 func TestToManySet(t *testing.T) {
 	t.Run("UserToAuthTokens", testUserToManySetOpAuthTokens)
+	t.Run("UserToFriendships", testUserToManySetOpFriendships)
+	t.Run("UserToFriendFriendships", testUserToManySetOpFriendFriendships)
 	t.Run("UserToRemoteUsers", testUserToManySetOpRemoteUsers)
 }
 
@@ -145,41 +170,49 @@ func TestToManySet(t *testing.T) {
 // or deadlocks can occur.
 func TestToManyRemove(t *testing.T) {
 	t.Run("UserToAuthTokens", testUserToManyRemoveOpAuthTokens)
+	t.Run("UserToFriendships", testUserToManyRemoveOpFriendships)
+	t.Run("UserToFriendFriendships", testUserToManyRemoveOpFriendFriendships)
 	t.Run("UserToRemoteUsers", testUserToManyRemoveOpRemoteUsers)
 }
 
 func TestReload(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensReload)
+	t.Run("Friendships", testFriendshipsReload)
 	t.Run("RemoteUsers", testRemoteUsersReload)
 	t.Run("Users", testUsersReload)
 }
 
 func TestReloadAll(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensReloadAll)
+	t.Run("Friendships", testFriendshipsReloadAll)
 	t.Run("RemoteUsers", testRemoteUsersReloadAll)
 	t.Run("Users", testUsersReloadAll)
 }
 
 func TestSelect(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensSelect)
+	t.Run("Friendships", testFriendshipsSelect)
 	t.Run("RemoteUsers", testRemoteUsersSelect)
 	t.Run("Users", testUsersSelect)
 }
 
 func TestUpdate(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensUpdate)
+	t.Run("Friendships", testFriendshipsUpdate)
 	t.Run("RemoteUsers", testRemoteUsersUpdate)
 	t.Run("Users", testUsersUpdate)
 }
 
 func TestSliceUpdateAll(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensSliceUpdateAll)
+	t.Run("Friendships", testFriendshipsSliceUpdateAll)
 	t.Run("RemoteUsers", testRemoteUsersSliceUpdateAll)
 	t.Run("Users", testUsersSliceUpdateAll)
 }
 
 func TestUpsert(t *testing.T) {
 	t.Run("AuthTokens", testAuthTokensUpsert)
+	t.Run("Friendships", testFriendshipsUpsert)
 	t.Run("RemoteUsers", testRemoteUsersUpsert)
 	t.Run("Users", testUsersUpsert)
 }

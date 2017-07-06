@@ -537,6 +537,154 @@ func testUserToManyAuthTokens(t *testing.T) {
 	}
 }
 
+func testUserToManyFriendships(t *testing.T) {
+	var err error
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, true, userColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize User struct: %s", err)
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	randomize.Struct(seed, &b, friendshipDBTypes, false, friendshipColumnsWithDefault...)
+	randomize.Struct(seed, &c, friendshipDBTypes, false, friendshipColumnsWithDefault...)
+
+	b.UserID.Valid = true
+	c.UserID.Valid = true
+	b.UserID.Int = a.ID
+	c.UserID.Int = a.ID
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	friendship, err := a.Friendships(tx).All()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range friendship {
+		if v.UserID.Int == b.UserID.Int {
+			bFound = true
+		}
+		if v.UserID.Int == c.UserID.Int {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := UserSlice{&a}
+	if err = a.L.LoadFriendships(tx, false, (*[]*User)(&slice)); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Friendships); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.Friendships = nil
+	if err = a.L.LoadFriendships(tx, true, &a); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Friendships); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", friendship)
+	}
+}
+
+func testUserToManyFriendFriendships(t *testing.T) {
+	var err error
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, true, userColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize User struct: %s", err)
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	randomize.Struct(seed, &b, friendshipDBTypes, false, friendshipColumnsWithDefault...)
+	randomize.Struct(seed, &c, friendshipDBTypes, false, friendshipColumnsWithDefault...)
+
+	b.FriendID.Valid = true
+	c.FriendID.Valid = true
+	b.FriendID.Int = a.ID
+	c.FriendID.Int = a.ID
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	friendship, err := a.FriendFriendships(tx).All()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range friendship {
+		if v.FriendID.Int == b.FriendID.Int {
+			bFound = true
+		}
+		if v.FriendID.Int == c.FriendID.Int {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := UserSlice{&a}
+	if err = a.L.LoadFriendFriendships(tx, false, (*[]*User)(&slice)); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.FriendFriendships); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.FriendFriendships = nil
+	if err = a.L.LoadFriendFriendships(tx, true, &a); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.FriendFriendships); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", friendship)
+	}
+}
+
 func testUserToManyRemoteUsers(t *testing.T) {
 	var err error
 	tx := MustTx(boil.Begin())
@@ -855,6 +1003,502 @@ func testUserToManyRemoveOpAuthTokens(t *testing.T) {
 		t.Error("relationship to d should have been preserved")
 	}
 	if a.R.AuthTokens[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testUserToManyAddOpFriendships(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Friendship{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, friendshipDBTypes, false, strmangle.SetComplement(friendshipPrimaryKeyColumns, friendshipColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Friendship{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddFriendships(tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if a.ID != first.UserID.Int {
+			t.Error("foreign key was wrong value", a.ID, first.UserID.Int)
+		}
+		if a.ID != second.UserID.Int {
+			t.Error("foreign key was wrong value", a.ID, second.UserID.Int)
+		}
+
+		if first.R.User != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.User != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.Friendships[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.Friendships[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.Friendships(tx).Count()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testUserToManySetOpFriendships(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Friendship{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, friendshipDBTypes, false, strmangle.SetComplement(friendshipPrimaryKeyColumns, friendshipColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetFriendships(tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Friendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetFriendships(tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Friendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if b.UserID.Valid {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if c.UserID.Valid {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if a.ID != d.UserID.Int {
+		t.Error("foreign key was wrong value", a.ID, d.UserID.Int)
+	}
+	if a.ID != e.UserID.Int {
+		t.Error("foreign key was wrong value", a.ID, e.UserID.Int)
+	}
+
+	if b.R.User != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.User != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.User != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.User != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.Friendships[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.Friendships[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testUserToManyRemoveOpFriendships(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Friendship{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, friendshipDBTypes, false, strmangle.SetComplement(friendshipPrimaryKeyColumns, friendshipColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddFriendships(tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Friendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveFriendships(tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Friendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if b.UserID.Valid {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if c.UserID.Valid {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.User != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.User != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.User != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.User != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.Friendships) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.Friendships[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.Friendships[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testUserToManyAddOpFriendFriendships(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Friendship{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, friendshipDBTypes, false, strmangle.SetComplement(friendshipPrimaryKeyColumns, friendshipColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Friendship{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddFriendFriendships(tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if a.ID != first.FriendID.Int {
+			t.Error("foreign key was wrong value", a.ID, first.FriendID.Int)
+		}
+		if a.ID != second.FriendID.Int {
+			t.Error("foreign key was wrong value", a.ID, second.FriendID.Int)
+		}
+
+		if first.R.Friend != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.Friend != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.FriendFriendships[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.FriendFriendships[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.FriendFriendships(tx).Count()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testUserToManySetOpFriendFriendships(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Friendship{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, friendshipDBTypes, false, strmangle.SetComplement(friendshipPrimaryKeyColumns, friendshipColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetFriendFriendships(tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.FriendFriendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetFriendFriendships(tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.FriendFriendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if b.FriendID.Valid {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if c.FriendID.Valid {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if a.ID != d.FriendID.Int {
+		t.Error("foreign key was wrong value", a.ID, d.FriendID.Int)
+	}
+	if a.ID != e.FriendID.Int {
+		t.Error("foreign key was wrong value", a.ID, e.FriendID.Int)
+	}
+
+	if b.R.Friend != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Friend != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Friend != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.Friend != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.FriendFriendships[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.FriendFriendships[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testUserToManyRemoveOpFriendFriendships(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Friendship
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Friendship{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, friendshipDBTypes, false, strmangle.SetComplement(friendshipPrimaryKeyColumns, friendshipColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddFriendFriendships(tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.FriendFriendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveFriendFriendships(tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.FriendFriendships(tx).Count()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if b.FriendID.Valid {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if c.FriendID.Valid {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.Friend != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Friend != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Friend != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.Friend != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.FriendFriendships) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.FriendFriendships[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.FriendFriendships[0] != &e {
 		t.Error("relationship to e should have been preserved")
 	}
 }

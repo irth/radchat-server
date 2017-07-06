@@ -12,3 +12,9 @@ CREATE TABLE remote_users (
   remote_id VARCHAR primary key,
   user_id INTEGER REFERENCES users
 );
+
+CREATE TABLE friendships (
+  id serial PRIMARY KEY,
+  user_id INTEGER REFERENCES users,
+  friend_id INTEGER REFERENCES users
+);
