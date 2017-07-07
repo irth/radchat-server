@@ -1,6 +1,6 @@
 
 -- +migrate Up
-CREATE TYPE status AS ENUM('inavailable', 'available', 'busy', 'away', 'invisible');
+CREATE TYPE status AS ENUM('inavailable', 'available', 'busy', 'away');
 
 ALTER TABLE users ADD COLUMN status status;
 UPDATE users SET status='inavailable' WHERE status IS NULL;

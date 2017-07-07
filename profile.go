@@ -19,6 +19,7 @@ type UserUpdateRequest struct {
 	AuthTokenRequest
 	DisplayName null.String `json:"display_name"`
 	Username    null.String `json:"username"`
+	Status      null.String `json:"status"`
 }
 
 func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
@@ -53,15 +54,21 @@ func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
 			u.Username = data.Username
 		}
 
+		if data.Status.Valid {
+			u.Status = data.Status.String
+		}
+
 		err = u.Update(a.DB)
 		if err != nil {
 			status := http.StatusInternalServerError
 			switch err := errors.Cause(err).(type) {
 			case *pq.Error:
-				if err.Code.Class().Name() == "integrity_constraint_violation" {
+				errClass := err.Code.Class().Name()
+				if errClass == "integrity_constraint_violation" || errClass == "data_exception" {
 					status = http.StatusUnprocessableEntity
-					// TODO: figure out what caused the constraint and report it
+					// TODO: figure out what caused the error and report it
 				}
+				fmt.Println(errClass)
 			}
 			errorResponse(w, err.Error(), status)
 			return
