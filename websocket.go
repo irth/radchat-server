@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -22,7 +21,6 @@ var upgrader = websocket.Upgrader{
 
 type Message struct {
 	Type string `json:"type"`
-	*AuthTokenRequest
 	*MsgBufferChange
 }
 
@@ -43,6 +41,11 @@ func readPump(conn *websocket.Conn, ch chan Message) {
 type JSON map[string]interface{}
 
 func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
+	u, err := a.requireUser(w, r)
+	if err != nil {
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	defer conn.Close()
 	if err != nil {
@@ -50,40 +53,8 @@ func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var msg Message
-	err = conn.ReadJSON(&msg)
-
-	if err != nil {
-		return
-	}
-
-	var u *models.User
-	var client *Client
-	switch msg.Type {
-	case "auth":
-		u, err = a.verifyAuthToken(msg.AuthTokenRequest.Token)
-		fmt.Println("???", err)
-		if err != nil {
-			conn.WriteJSON(JSON{
-				"type":    "auth",
-				"success": false,
-			})
-			return
-		}
-		conn.WriteJSON(JSON{
-			"type":    "auth",
-			"success": true,
-		})
-		client = a.Hub.RegisterClient(u.ID)
-		defer a.Hub.UnregisterClient(u.ID)
-	default:
-		conn.WriteJSON(JSON{
-			"type":  "error",
-			"error": "Authorize first.",
-		})
-		return
-	}
-
+	client := a.Hub.RegisterClient(u.ID)
+	defer a.Hub.UnregisterClient(u.ID)
 	readChannel := make(chan Message)
 	go readPump(conn, readChannel)
 
@@ -95,17 +66,14 @@ func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 			switch msg.Type {
 			case "getFriends":
-				friendsList := []JSON{}
+				friendsList := []*models.User{}
 				friendships, err := u.Friendships(a.DB, qm.Load("Friend")).All()
 				if err != nil {
 					continue
 				}
 				for _, friendship := range friendships {
 					f := friendship.R.Friend
-					friendsList = append(friendsList, JSON{
-						"display_name": f.DisplayName,
-						"id":           f.ID,
-					})
+					friendsList = append(friendsList, f)
 				}
 				conn.WriteJSON(JSON{
 					"type":    "friendsList",
