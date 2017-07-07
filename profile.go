@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/lib/pq"
@@ -21,6 +22,7 @@ type UserUpdateRequest struct {
 }
 
 func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.Method)
 	if r.Method == "GET" {
 		u, err := a.requireUser(w, r)
 		if err != nil {
@@ -39,6 +41,7 @@ func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
 
 		u, err := a.verifyAuthToken(data.Token)
 		if err != nil {
+			errorResponse(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -63,7 +66,6 @@ func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
 			errorResponse(w, err.Error(), status)
 			return
 		}
-
 		json.NewEncoder(w).Encode(u)
 	}
 

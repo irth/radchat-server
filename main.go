@@ -47,7 +47,9 @@ func main() {
 	app.registerProfileHandlers(mux)
 	app.registerWebsocketHandlers(mux)
 
-	handler := cors.Default().Handler(mux)
+	handler := cors.New(cors.Options{
+		AllowedMethods: []string{"GET", "POST", "PATCH"},
+	}).Handler(mux)
 
 	log.Print("Listening on ", *address)
 	log.Fatal(http.ListenAndServe(*address, handler))
