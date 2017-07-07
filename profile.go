@@ -73,6 +73,15 @@ func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
 			errorResponse(w, err.Error(), status)
 			return
 		}
+
+		if data.Status.Valid {
+			friendships, err := u.Friendships(a.DB).All()
+			if err == nil {
+				for _, friendship := range friendships {
+					a.Hub.SendToClient(friendship.FriendID.Int, MsgStatusChange{Sender: u.ID, Status: u.Status})
+				}
+			}
+		}
 		json.NewEncoder(w).Encode(u)
 	}
 

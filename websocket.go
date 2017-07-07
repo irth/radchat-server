@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -84,6 +85,7 @@ func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				client.Output <- *msg.MsgBufferChange
 			}
 		case msg := <-client.Input:
+			fmt.Println(msg)
 			conn.WriteJSON(msg)
 		}
 	}
