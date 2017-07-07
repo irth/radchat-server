@@ -46,3 +46,12 @@ func makeCacheKey(wl, nzDefaults []string) string {
 	strmangle.PutBuffer(buf)
 	return str
 }
+
+// Enum values for status
+const (
+	StatusInavailable = "inavailable"
+	StatusAvailable   = "available"
+	StatusBusy        = "busy"
+	StatusAway        = "away"
+	StatusInvisible   = "invisible"
+)

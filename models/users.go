@@ -26,6 +26,7 @@ type User struct {
 	ID          int         `boil:"id" json:"id" toml:"id" yaml:"id"`
 	DisplayName string      `boil:"display_name" json:"display_name" toml:"display_name" yaml:"display_name"`
 	Username    null.String `boil:"username" json:"username,omitempty" toml:"username" yaml:"username,omitempty"`
+	Status      string      `boil:"status" json:"status" toml:"status" yaml:"status"`
 
 	R *userR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L userL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -35,10 +36,12 @@ var UserColumns = struct {
 	ID          string
 	DisplayName string
 	Username    string
+	Status      string
 }{
 	ID:          "id",
 	DisplayName: "display_name",
 	Username:    "username",
+	Status:      "status",
 }
 
 // userR is where relationships are stored.
@@ -53,8 +56,8 @@ type userR struct {
 type userL struct{}
 
 var (
-	userColumns               = []string{"id", "display_name", "username"}
-	userColumnsWithoutDefault = []string{"display_name", "username"}
+	userColumns               = []string{"id", "display_name", "username", "status"}
+	userColumnsWithoutDefault = []string{"display_name", "username", "status"}
 	userColumnsWithDefault    = []string{"id"}
 	userPrimaryKeyColumns     = []string{"id"}
 )
