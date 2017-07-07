@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/irth/radchat-server/models"
-	"github.com/vattle/sqlboiler/queries/qm"
 )
 
 func (a *App) registerWebsocketHandlers(mux *http.ServeMux) {
@@ -20,14 +17,9 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-type Message struct {
-	Type string `json:"type"`
-	*MsgBufferChange
-}
-
-func readPump(conn *websocket.Conn, ch chan Message) {
+func readPump(conn *websocket.Conn, ch chan MsgBufferChange) {
 	for {
-		var msg Message
+		var msg MsgBufferChange
 		err := conn.ReadJSON(&msg)
 
 		if err != nil {
@@ -56,7 +48,7 @@ func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	client := a.Hub.RegisterClient(u.ID)
 	defer a.Hub.UnregisterClient(u.ID)
-	readChannel := make(chan Message)
+	readChannel := make(chan MsgBufferChange)
 	go readPump(conn, readChannel)
 
 	for {
@@ -65,27 +57,10 @@ func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			if !more {
 				return
 			}
-			switch msg.Type {
-			case "getFriends":
-				friendsList := []*models.User{}
-				friendships, err := u.Friendships(a.DB, qm.Load("Friend")).All()
-				if err != nil {
-					continue
-				}
-				for _, friendship := range friendships {
-					f := friendship.R.Friend
-					friendsList = append(friendsList, f)
-				}
-				conn.WriteJSON(JSON{
-					"type":    "friendsList",
-					"friends": friendsList,
-				})
-			case "inputBufferUpdate":
-				msg.Sender = u.ID
-				client.Output <- *msg.MsgBufferChange
-			}
+			msg.Sender = u.ID
+			client.Output <- msg
+
 		case msg := <-client.Input:
-			fmt.Println(msg)
 			conn.WriteJSON(msg)
 		}
 	}

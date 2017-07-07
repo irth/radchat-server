@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/irth/radchat-server/models"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
+	"github.com/vattle/sqlboiler/queries/qm"
 
 	null "gopkg.in/nullbio/null.v6"
 )
 
 func (a *App) registerProfileHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("/profile/me", a.handleOwnProfile)
+	mux.HandleFunc("/profile", a.handleOwnProfile)
+	mux.HandleFunc("/friends", a.handleFriends)
 }
 
 type UserUpdateRequest struct {
@@ -22,8 +25,29 @@ type UserUpdateRequest struct {
 	Status      null.String `json:"status"`
 }
 
+func (a *App) handleFriends(w http.ResponseWriter, r *http.Request) {
+	u, err := a.requireUser(w, r)
+	if err != nil {
+		return
+	}
+
+	friendsList := []*models.User{}
+	friendships, err := u.Friendships(a.DB, qm.Load("Friend")).All()
+	if err != nil {
+		errorResponse(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	for _, friendship := range friendships {
+		f := friendship.R.Friend
+		friendsList = append(friendsList, f)
+	}
+
+	json.NewEncoder(w).Encode(JSON{
+		"friends": friendsList,
+	})
+}
+
 func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.Method)
 	if r.Method == "GET" {
 		u, err := a.requireUser(w, r)
 		if err != nil {
@@ -78,7 +102,7 @@ func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
 			friendships, err := u.Friendships(a.DB).All()
 			if err == nil {
 				for _, friendship := range friendships {
-					a.Hub.SendToClient(friendship.FriendID.Int, MsgStatusChange{Sender: u.ID, Status: u.Status})
+					a.Hub.SendToClient(friendship.FriendID.Int, JSON{"type": "statusUpdate", "id": u.ID, "status": u.Status})
 				}
 			}
 		}

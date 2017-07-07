@@ -2,11 +2,6 @@ package main
 
 import "fmt"
 
-type MsgStatusChange struct {
-	Sender int    `json:"id"`
-	Status string `json:"status"`
-}
-
 type MsgBufferChange struct {
 	Sender int    `json:"-"`
 	ID     int    `json:"id"`
@@ -62,6 +57,7 @@ func (h *Hub) Run() {
 		switch msg := msg.(type) {
 		case MsgBufferChange:
 			if c, ok := h.clients[msg.ID]; ok {
+				fmt.Println(msg.Value)
 				c.Input <- MsgBufferChange{
 					ID:    msg.Sender,
 					Value: msg.Value,
