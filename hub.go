@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"container/list"
+	"fmt"
+)
 
 type MsgBufferChange struct {
 	Sender int    `json:"-"`
@@ -9,60 +12,81 @@ type MsgBufferChange struct {
 }
 
 type Client struct {
-	Input  chan interface{}
-	Output chan interface{}
+	ID         int
+	Input      chan interface{}
+	Output     chan interface{}
+	Unregister func()
 }
 
 // Hub manages connected clients and takes care of routing messages
 type Hub struct {
-	clients   map[int]*Client
-	broadcast chan interface{}
+	register   chan *Client
+	unregister chan *list.Element
+	clients    map[int]*list.List
+	broadcast  chan interface{}
 }
 
 func newHub() *Hub {
 	return &Hub{
-		broadcast: make(chan interface{}),
-		clients:   make(map[int]*Client),
+		register:   make(chan *Client),
+		unregister: make(chan *list.Element),
+		broadcast:  make(chan interface{}),
+		clients:    make(map[int]*list.List),
 	}
 }
 
 func (h *Hub) RegisterClient(id int) *Client {
 	c := &Client{
+		ID:     id,
 		Input:  make(chan interface{}),
 		Output: h.broadcast,
 	}
-
-	h.clients[id] = c
-	fmt.Println("registered", id, h.clients)
+	h.register <- c
 	return c
 }
 
-func (h *Hub) SendToClient(id int, msg interface{}) {
+func (h *Hub) SendToUser(id int, msg interface{}) {
 	fmt.Println("sending...", id)
-	if c, ok := h.clients[id]; ok {
-		c.Input <- msg
+	if l, ok := h.clients[id]; ok {
+		for c := l.Front(); c != nil; c = c.Next() {
+			c.Value.(*Client).Input <- msg
+		}
 	}
-}
-
-func (h *Hub) UnregisterClient(id int) {
-	if _, ok := h.clients[id]; ok {
-		delete(h.clients, id)
-	}
-	fmt.Println("unregistered", id, h.clients)
 }
 
 func (h *Hub) Run() {
 	for {
-		msg := <-h.broadcast
-		switch msg := msg.(type) {
-		case MsgBufferChange:
-			if c, ok := h.clients[msg.ID]; ok {
+		select {
+		case msg := <-h.broadcast:
+			switch msg := msg.(type) {
+			case MsgBufferChange:
 				fmt.Println(msg.Value)
-				c.Input <- MsgBufferChange{
+				h.SendToUser(msg.ID, MsgBufferChange{
 					ID:    msg.Sender,
 					Value: msg.Value,
+				})
+			}
+
+		case c := <-h.register:
+			if _, ok := h.clients[c.ID]; !ok {
+				h.clients[c.ID] = list.New()
+			}
+
+			el := h.clients[c.ID].PushFront(c)
+			c.Unregister = func() {
+				h.unregister <- el
+			}
+			fmt.Println("registered", c.ID, h.clients)
+
+		case e := <-h.unregister:
+			id := e.Value.(*Client).ID
+			if l, ok := h.clients[id]; ok {
+				l.Remove(e)
+				if l.Len() == 0 {
+					delete(h.clients, id)
 				}
 			}
+			fmt.Println("unregistered", id, h.clients)
 		}
 	}
 }

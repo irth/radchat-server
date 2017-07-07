@@ -102,7 +102,7 @@ func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
 			friendships, err := u.Friendships(a.DB).All()
 			if err == nil {
 				for _, friendship := range friendships {
-					a.Hub.SendToClient(friendship.FriendID.Int, JSON{"type": "statusUpdate", "id": u.ID, "status": u.Status})
+					a.Hub.SendToUser(friendship.FriendID.Int, JSON{"type": "statusUpdate", "id": u.ID, "status": u.Status})
 				}
 			}
 		}

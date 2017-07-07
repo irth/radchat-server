@@ -47,7 +47,7 @@ func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := a.Hub.RegisterClient(u.ID)
-	defer a.Hub.UnregisterClient(u.ID)
+	defer client.Unregister()
 	readChannel := make(chan MsgBufferChange)
 	go readPump(conn, readChannel)
 
