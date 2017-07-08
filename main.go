@@ -32,7 +32,8 @@ func main() {
 		panic(err)
 	}
 	boil.SetDB(db)
-	
+	boil.DebugMode = true
+
 	app := App{
 		db,
 		&googleVerifier.Verifier{ClientID: "41009918331-5jiap87h9iaaag4qi597siluelvq3706.apps.googleusercontent.com"},
@@ -48,6 +49,7 @@ func main() {
 	app.registerAuthHandlers(mux)
 	app.registerProfileHandlers(mux)
 	app.registerWebsocketHandlers(mux)
+	app.registerMessageHandlers(mux)
 
 	handler := cors.New(cors.Options{
 		AllowedMethods: []string{"GET", "POST", "PATCH"},
