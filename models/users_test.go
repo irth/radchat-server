@@ -1821,7 +1821,7 @@ func testUsersSelect(t *testing.T) {
 }
 
 var (
-	userDBTypes = map[string]string{`DisplayName`: `character varying`, `ID`: `integer`, `Status`: `enum.status('inavailable','available','busy','away','invisible')`, `Username`: `character varying`}
+	userDBTypes = map[string]string{`DisplayName`: `character varying`, `ID`: `integer`, `Status`: `enum.status('unavailable','available','busy','away')`, `Username`: `character varying`}
 	_           = bytes.MinRead
 )
 

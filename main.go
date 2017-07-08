@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	_ "github.com/lib/pq"
+	"github.com/vattle/sqlboiler/boil"
 
 	"database/sql"
 
@@ -30,7 +31,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
+	boil.SetDB(db)
+	
 	app := App{
 		db,
 		&googleVerifier.Verifier{ClientID: "41009918331-5jiap87h9iaaag4qi597siluelvq3706.apps.googleusercontent.com"},

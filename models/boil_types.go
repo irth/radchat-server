@@ -49,9 +49,8 @@ func makeCacheKey(wl, nzDefaults []string) string {
 
 // Enum values for status
 const (
-	StatusInavailable = "inavailable"
+	StatusUnavailable = "unavailable"
 	StatusAvailable   = "available"
 	StatusBusy        = "busy"
 	StatusAway        = "away"
-	StatusInvisible   = "invisible"
 )

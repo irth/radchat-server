@@ -39,6 +39,9 @@ func (a *App) handleFriends(w http.ResponseWriter, r *http.Request) {
 
 	for _, friendship := range friendships {
 		f := friendship.R.Friend
+		if !a.Hub.IsConnected(f.ID) {
+			f.Status = models.StatusUnavailable
+		}
 		friendsList = append(friendsList, f)
 	}
 

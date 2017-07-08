@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+
+	"github.com/irth/radchat-server/models"
 )
 
 type MsgBufferChange struct {
@@ -56,6 +58,11 @@ func (h *Hub) SendToUser(id int, msg interface{}) {
 	}
 }
 
+func (h *Hub) IsConnected(id int) bool {
+	_, ok := h.clients[id]
+	return ok
+}
+
 func (h *Hub) Run() {
 	for {
 		select {
@@ -76,6 +83,12 @@ func (h *Hub) Run() {
 
 			h.clients[c.ID][c] = true
 			fmt.Println("registered", c.ID, h.clients)
+			go h.SendToFriends(
+				c.ID,
+				func(u *models.User) interface{} {
+					return JSON{"type": "statusUpdate", "id": u.ID, "status": u.Status}
+				},
+			)
 
 		case c := <-h.unregister:
 			if _, ok := h.clients[c.ID]; ok {
@@ -85,6 +98,12 @@ func (h *Hub) Run() {
 				}
 			}
 			fmt.Println("deregistered", c.ID, h.clients)
+			go h.SendToFriends(
+				c.ID,
+				func(u *models.User) interface{} {
+					return JSON{"type": "statusUpdate", "id": u.ID, "status": models.StatusUnavailable}
+				},
+			)
 		}
 	}
 }
