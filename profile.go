@@ -99,6 +99,9 @@ func (a *App) handleOwnProfile(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if data.Status.Valid {
+			a.Hub.SendToUser(u.ID, JSON{"type": "statusUpdate", "id": u.ID, "status": u.Status}) // notify other connected clients
+
+			// notify user's friends
 			friendships, err := u.Friendships(a.DB).All()
 			if err == nil {
 				for _, friendship := range friendships {
