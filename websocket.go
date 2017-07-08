@@ -57,8 +57,7 @@ func (a *App) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			if !more {
 				return
 			}
-			msg.Sender = u.ID
-			client.Output <- msg
+			a.Hub.SendToUser(msg.ID, JSON{"type": "inputBufferUpdate", "id": u.ID, "value": msg.Value})
 
 		case msg := <-client.Input:
 			conn.WriteJSON(msg)

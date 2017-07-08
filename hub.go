@@ -37,9 +37,8 @@ func newHub() *Hub {
 
 func (h *Hub) RegisterClient(id int) *Client {
 	c := &Client{
-		ID:     id,
-		Input:  make(chan interface{}),
-		Output: h.broadcast,
+		ID:    id,
+		Input: make(chan interface{}),
 	}
 	h.register <- c
 	return c
@@ -66,16 +65,6 @@ func (h *Hub) IsConnected(id int) bool {
 func (h *Hub) Run() {
 	for {
 		select {
-		case msg := <-h.broadcast:
-			switch msg := msg.(type) {
-			case MsgBufferChange:
-				fmt.Println(msg.Value)
-				h.SendToUser(msg.ID, MsgBufferChange{
-					ID:    msg.Sender,
-					Value: msg.Value,
-				})
-			}
-
 		case c := <-h.register:
 			if _, ok := h.clients[c.ID]; !ok {
 				h.clients[c.ID] = make(map[*Client]bool)
@@ -83,7 +72,7 @@ func (h *Hub) Run() {
 
 			h.clients[c.ID][c] = true
 			fmt.Println("registered", c.ID, h.clients)
-			go h.SendToFriends(
+			go h.SendToFriendsWithUser(
 				c.ID,
 				func(u *models.User) interface{} {
 					return JSON{"type": "statusUpdate", "id": u.ID, "status": u.Status}
@@ -98,12 +87,13 @@ func (h *Hub) Run() {
 				}
 			}
 			fmt.Println("deregistered", c.ID, h.clients)
-			go h.SendToFriends(
+			go h.SendToFriendsWithUser(
 				c.ID,
 				func(u *models.User) interface{} {
 					return JSON{"type": "statusUpdate", "id": u.ID, "status": models.StatusUnavailable}
 				},
 			)
+			go h.SendToFriends(c.ID, JSON{"type": "inputBufferUpdate", "id": c.ID, "value": ""})
 		}
 	}
 }

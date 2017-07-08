@@ -59,7 +59,7 @@ func (a *App) requireUser(w http.ResponseWriter, r *http.Request) (*models.User,
 	return u, nil
 }
 
-func (h *Hub) SendToFriends(id int, f func(u *models.User) interface{}) {
+func (h *Hub) SendToFriendsWithUser(id int, f func(u *models.User) interface{}) {
 	u, err := models.FindUserG(id)
 	if err != nil {
 		return
@@ -70,4 +70,8 @@ func (h *Hub) SendToFriends(id int, f func(u *models.User) interface{}) {
 			h.SendToUser(friendship.FriendID.Int, f(u))
 		}
 	}
+}
+
+func (h *Hub) SendToFriends(id int, msg interface{}) {
+	h.SendToFriendsWithUser(id, func(u *models.User) interface{} { return msg })
 }
