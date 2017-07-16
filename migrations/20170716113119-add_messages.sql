@@ -4,7 +4,7 @@ CREATE TABLE messages (
   id serial primary key not null,
   sender_id INTEGER REFERENCES users not null,
   target_id INTEGER REFERENCES users not null,
-  created_at TIMESTAMP,
+  created_at TIMESTAMP not null,
   content TEXT NOT NULL
 );
 

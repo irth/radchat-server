@@ -94,11 +94,13 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 
 	timestampStr := r.URL.Query().Get("before")
 	if len(timestampStr) > 0 {
-		timestamp, err := time.Parse("2006-01-02T15:04:05.999999999Z", timestampStr)
+		timestampInt, err := strconv.ParseInt(timestampStr, 10, 64)
 		if err != nil {
-			errorResponse(w, "Invalid date.", http.StatusUnprocessableEntity)
+			errorResponse(w, "Invalid time.", http.StatusUnprocessableEntity)
 			return
 		}
+		timestamp := time.Unix(0, timestampInt).UTC()
+		fmt.Println(timestamp)
 		queryMods = append(queryMods, qm.And("created_at < ?", timestamp))
 	}
 
@@ -110,15 +112,18 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if messages == nil {
-		messages = models.MessageSlice{}
+	response := []JSON{}
+
+	for i := len(messages) - 1; i >= 0; i-- {
+		m := messages[i]
+		response = append(response, JSON{
+			"id":        m.ID,
+			"timestamp": m.CreatedAt.UnixNano(),
+			"sender":    m.SenderID,
+			"target":    m.TargetID,
+			"message":   m.Content,
+		})
 	}
 
-	// reverse the messages
-	// https://github.com/golang/go/wiki/SliceTricks
-	for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
-		messages[left], messages[right] = messages[right], messages[left]
-	}
-
-	json.NewEncoder(w).Encode(messages)
+	json.NewEncoder(w).Encode(response)
 }

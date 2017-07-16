@@ -18,7 +18,6 @@ import (
 	"github.com/vattle/sqlboiler/queries"
 	"github.com/vattle/sqlboiler/queries/qm"
 	"github.com/vattle/sqlboiler/strmangle"
-	"gopkg.in/nullbio/null.v6"
 )
 
 // Message is an object representing the database table.
@@ -26,7 +25,7 @@ type Message struct {
 	ID        int       `boil:"id" json:"id" toml:"id" yaml:"id"`
 	SenderID  int       `boil:"sender_id" json:"sender_id" toml:"sender_id" yaml:"sender_id"`
 	TargetID  int       `boil:"target_id" json:"target_id" toml:"target_id" yaml:"target_id"`
-	CreatedAt null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	CreatedAt time.Time `boil:"created_at" json:"created_at" toml:"created_at" yaml:"created_at"`
 	Content   string    `boil:"content" json:"content" toml:"content" yaml:"content"`
 
 	R *messageR `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -779,9 +778,8 @@ func (o *Message) Insert(exec boil.Executor, whitelist ...string) error {
 	var err error
 	currTime := time.Now().In(boil.GetLocation())
 
-	if o.CreatedAt.Time.IsZero() {
-		o.CreatedAt.Time = currTime
-		o.CreatedAt.Valid = true
+	if o.CreatedAt.IsZero() {
+		o.CreatedAt = currTime
 	}
 
 	if err := o.doBeforeInsertHooks(exec); err != nil {
@@ -1051,9 +1049,8 @@ func (o *Message) Upsert(exec boil.Executor, updateOnConflict bool, conflictColu
 	}
 	currTime := time.Now().In(boil.GetLocation())
 
-	if o.CreatedAt.Time.IsZero() {
-		o.CreatedAt.Time = currTime
-		o.CreatedAt.Valid = true
+	if o.CreatedAt.IsZero() {
+		o.CreatedAt = currTime
 	}
 
 	if err := o.doBeforeUpsertHooks(exec); err != nil {
