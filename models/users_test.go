@@ -685,6 +685,150 @@ func testUserToManyFriendFriendships(t *testing.T) {
 	}
 }
 
+func testUserToManySenderMessages(t *testing.T) {
+	var err error
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c Message
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, true, userColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize User struct: %s", err)
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	randomize.Struct(seed, &b, messageDBTypes, false, messageColumnsWithDefault...)
+	randomize.Struct(seed, &c, messageDBTypes, false, messageColumnsWithDefault...)
+
+	b.SenderID = a.ID
+	c.SenderID = a.ID
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	message, err := a.SenderMessages(tx).All()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range message {
+		if v.SenderID == b.SenderID {
+			bFound = true
+		}
+		if v.SenderID == c.SenderID {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := UserSlice{&a}
+	if err = a.L.LoadSenderMessages(tx, false, (*[]*User)(&slice)); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.SenderMessages); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.SenderMessages = nil
+	if err = a.L.LoadSenderMessages(tx, true, &a); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.SenderMessages); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", message)
+	}
+}
+
+func testUserToManyTargetMessages(t *testing.T) {
+	var err error
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c Message
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, true, userColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize User struct: %s", err)
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	randomize.Struct(seed, &b, messageDBTypes, false, messageColumnsWithDefault...)
+	randomize.Struct(seed, &c, messageDBTypes, false, messageColumnsWithDefault...)
+
+	b.TargetID = a.ID
+	c.TargetID = a.ID
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	message, err := a.TargetMessages(tx).All()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range message {
+		if v.TargetID == b.TargetID {
+			bFound = true
+		}
+		if v.TargetID == c.TargetID {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := UserSlice{&a}
+	if err = a.L.LoadTargetMessages(tx, false, (*[]*User)(&slice)); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.TargetMessages); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.TargetMessages = nil
+	if err = a.L.LoadTargetMessages(tx, true, &a); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.TargetMessages); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", message)
+	}
+}
+
 func testUserToManyRemoteUsers(t *testing.T) {
 	var err error
 	tx := MustTx(boil.Begin())
@@ -1503,6 +1647,154 @@ func testUserToManyRemoveOpFriendFriendships(t *testing.T) {
 	}
 }
 
+func testUserToManyAddOpSenderMessages(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Message
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Message{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, messageDBTypes, false, strmangle.SetComplement(messagePrimaryKeyColumns, messageColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Message{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddSenderMessages(tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if a.ID != first.SenderID {
+			t.Error("foreign key was wrong value", a.ID, first.SenderID)
+		}
+		if a.ID != second.SenderID {
+			t.Error("foreign key was wrong value", a.ID, second.SenderID)
+		}
+
+		if first.R.Sender != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.Sender != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.SenderMessages[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.SenderMessages[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.SenderMessages(tx).Count()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+func testUserToManyAddOpTargetMessages(t *testing.T) {
+	var err error
+
+	tx := MustTx(boil.Begin())
+	defer tx.Rollback()
+
+	var a User
+	var b, c, d, e Message
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Message{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, messageDBTypes, false, strmangle.SetComplement(messagePrimaryKeyColumns, messageColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Message{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddTargetMessages(tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if a.ID != first.TargetID {
+			t.Error("foreign key was wrong value", a.ID, first.TargetID)
+		}
+		if a.ID != second.TargetID {
+			t.Error("foreign key was wrong value", a.ID, second.TargetID)
+		}
+
+		if first.R.Target != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.Target != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.TargetMessages[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.TargetMessages[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.TargetMessages(tx).Count()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
 func testUserToManyAddOpRemoteUsers(t *testing.T) {
 	var err error
 

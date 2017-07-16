@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"encoding/json"
+
+	"github.com/irth/radchat-server/models"
 	"github.com/vattle/sqlboiler/queries/qm"
 )
 
@@ -13,8 +16,14 @@ func (a *App) registerMessageHandlers(mux *http.ServeMux) {
 
 type ReqMessageSend struct {
 	AuthTokenRequest
-	Target  int    `json:"id"`
+	Target  int    `json:"target"`
 	Message string `json:"message"`
+}
+
+type ResMessageSend struct {
+	Success bool   `json:"success"`
+	ID      int    `json:"id,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
@@ -36,12 +45,23 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 	isFriend, err := u.FriendshipsG(qm.Where("friend_id=?", req.Target)).Exists()
 
 	fmt.Println(req, isFriend, err)
-	if err != nil {
+	if err != nil || !isFriend {
 		errorResponse(w, "Unauthorized (you're not friends)", http.StatusUnauthorized)
 		return
 	}
 
-	if isFriend {
-		a.Hub.SendToUser(req.Target, JSON{"type": "message", "from": u.ID, "message": req.Message})
+	m := models.Message{
+		SenderID: u.ID,
+		TargetID: req.Target,
+		Content:  req.Message,
 	}
+
+	err = m.InsertG()
+	if err != nil {
+		errorResponse(w, "Couldn't send the message", http.StatusInternalServerError)
+		return
+	}
+
+	a.Hub.SendToUser(req.Target, JSON{"type": "message", "id": m.ID, "sender": u.ID, "message": req.Message})
+	json.NewEncoder(w).Encode(ResMessageSend{Success: true, ID: m.ID})
 }

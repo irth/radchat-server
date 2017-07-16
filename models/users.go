@@ -49,6 +49,8 @@ type userR struct {
 	AuthTokens        AuthTokenSlice
 	Friendships       FriendshipSlice
 	FriendFriendships FriendshipSlice
+	SenderMessages    MessageSlice
+	TargetMessages    MessageSlice
 	RemoteUsers       RemoteUserSlice
 }
 
@@ -416,6 +418,58 @@ func (o *User) FriendFriendships(exec boil.Executor, mods ...qm.QueryMod) friend
 	return query
 }
 
+// SenderMessagesG retrieves all the message's messages via sender_id column.
+func (o *User) SenderMessagesG(mods ...qm.QueryMod) messageQuery {
+	return o.SenderMessages(boil.GetDB(), mods...)
+}
+
+// SenderMessages retrieves all the message's messages with an executor via sender_id column.
+func (o *User) SenderMessages(exec boil.Executor, mods ...qm.QueryMod) messageQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"messages\".\"sender_id\"=?", o.ID),
+	)
+
+	query := Messages(exec, queryMods...)
+	queries.SetFrom(query.Query, "\"messages\"")
+
+	if len(queries.GetSelect(query.Query)) == 0 {
+		queries.SetSelect(query.Query, []string{"\"messages\".*"})
+	}
+
+	return query
+}
+
+// TargetMessagesG retrieves all the message's messages via target_id column.
+func (o *User) TargetMessagesG(mods ...qm.QueryMod) messageQuery {
+	return o.TargetMessages(boil.GetDB(), mods...)
+}
+
+// TargetMessages retrieves all the message's messages with an executor via target_id column.
+func (o *User) TargetMessages(exec boil.Executor, mods ...qm.QueryMod) messageQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"messages\".\"target_id\"=?", o.ID),
+	)
+
+	query := Messages(exec, queryMods...)
+	queries.SetFrom(query.Query, "\"messages\"")
+
+	if len(queries.GetSelect(query.Query)) == 0 {
+		queries.SetSelect(query.Query, []string{"\"messages\".*"})
+	}
+
+	return query
+}
+
 // RemoteUsersG retrieves all the remote_user's remote users.
 func (o *User) RemoteUsersG(mods ...qm.QueryMod) remoteUserQuery {
 	return o.RemoteUsers(boil.GetDB(), mods...)
@@ -650,6 +704,150 @@ func (userL) LoadFriendFriendships(e boil.Executor, singular bool, maybeUser int
 		for _, local := range slice {
 			if local.ID == foreign.FriendID.Int {
 				local.R.FriendFriendships = append(local.R.FriendFriendships, foreign)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadSenderMessages allows an eager lookup of values, cached into the
+// loaded structs of the objects.
+func (userL) LoadSenderMessages(e boil.Executor, singular bool, maybeUser interface{}) error {
+	var slice []*User
+	var object *User
+
+	count := 1
+	if singular {
+		object = maybeUser.(*User)
+	} else {
+		slice = *maybeUser.(*[]*User)
+		count = len(slice)
+	}
+
+	args := make([]interface{}, count)
+	if singular {
+		if object.R == nil {
+			object.R = &userR{}
+		}
+		args[0] = object.ID
+	} else {
+		for i, obj := range slice {
+			if obj.R == nil {
+				obj.R = &userR{}
+			}
+			args[i] = obj.ID
+		}
+	}
+
+	query := fmt.Sprintf(
+		"select * from \"messages\" where \"sender_id\" in (%s)",
+		strmangle.Placeholders(dialect.IndexPlaceholders, count, 1, 1),
+	)
+	if boil.DebugMode {
+		fmt.Fprintf(boil.DebugWriter, "%s\n%v\n", query, args)
+	}
+
+	results, err := e.Query(query, args...)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load messages")
+	}
+	defer results.Close()
+
+	var resultSlice []*Message
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice messages")
+	}
+
+	if len(messageAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.SenderMessages = resultSlice
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if local.ID == foreign.SenderID {
+				local.R.SenderMessages = append(local.R.SenderMessages, foreign)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadTargetMessages allows an eager lookup of values, cached into the
+// loaded structs of the objects.
+func (userL) LoadTargetMessages(e boil.Executor, singular bool, maybeUser interface{}) error {
+	var slice []*User
+	var object *User
+
+	count := 1
+	if singular {
+		object = maybeUser.(*User)
+	} else {
+		slice = *maybeUser.(*[]*User)
+		count = len(slice)
+	}
+
+	args := make([]interface{}, count)
+	if singular {
+		if object.R == nil {
+			object.R = &userR{}
+		}
+		args[0] = object.ID
+	} else {
+		for i, obj := range slice {
+			if obj.R == nil {
+				obj.R = &userR{}
+			}
+			args[i] = obj.ID
+		}
+	}
+
+	query := fmt.Sprintf(
+		"select * from \"messages\" where \"target_id\" in (%s)",
+		strmangle.Placeholders(dialect.IndexPlaceholders, count, 1, 1),
+	)
+	if boil.DebugMode {
+		fmt.Fprintf(boil.DebugWriter, "%s\n%v\n", query, args)
+	}
+
+	results, err := e.Query(query, args...)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load messages")
+	}
+	defer results.Close()
+
+	var resultSlice []*Message
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice messages")
+	}
+
+	if len(messageAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.TargetMessages = resultSlice
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if local.ID == foreign.TargetID {
+				local.R.TargetMessages = append(local.R.TargetMessages, foreign)
 				break
 			}
 		}
@@ -1390,6 +1588,174 @@ func (o *User) RemoveFriendFriendships(exec boil.Executor, related ...*Friendshi
 		}
 	}
 
+	return nil
+}
+
+// AddSenderMessagesG adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.SenderMessages.
+// Sets related.R.Sender appropriately.
+// Uses the global database handle.
+func (o *User) AddSenderMessagesG(insert bool, related ...*Message) error {
+	return o.AddSenderMessages(boil.GetDB(), insert, related...)
+}
+
+// AddSenderMessagesP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.SenderMessages.
+// Sets related.R.Sender appropriately.
+// Panics on error.
+func (o *User) AddSenderMessagesP(exec boil.Executor, insert bool, related ...*Message) {
+	if err := o.AddSenderMessages(exec, insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddSenderMessagesGP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.SenderMessages.
+// Sets related.R.Sender appropriately.
+// Uses the global database handle and panics on error.
+func (o *User) AddSenderMessagesGP(insert bool, related ...*Message) {
+	if err := o.AddSenderMessages(boil.GetDB(), insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddSenderMessages adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.SenderMessages.
+// Sets related.R.Sender appropriately.
+func (o *User) AddSenderMessages(exec boil.Executor, insert bool, related ...*Message) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			rel.SenderID = o.ID
+			if err = rel.Insert(exec); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"messages\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"sender_id"}),
+				strmangle.WhereClause("\"", "\"", 2, messagePrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.DebugMode {
+				fmt.Fprintln(boil.DebugWriter, updateQuery)
+				fmt.Fprintln(boil.DebugWriter, values)
+			}
+
+			if _, err = exec.Exec(updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			rel.SenderID = o.ID
+		}
+	}
+
+	if o.R == nil {
+		o.R = &userR{
+			SenderMessages: related,
+		}
+	} else {
+		o.R.SenderMessages = append(o.R.SenderMessages, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &messageR{
+				Sender: o,
+			}
+		} else {
+			rel.R.Sender = o
+		}
+	}
+	return nil
+}
+
+// AddTargetMessagesG adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.TargetMessages.
+// Sets related.R.Target appropriately.
+// Uses the global database handle.
+func (o *User) AddTargetMessagesG(insert bool, related ...*Message) error {
+	return o.AddTargetMessages(boil.GetDB(), insert, related...)
+}
+
+// AddTargetMessagesP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.TargetMessages.
+// Sets related.R.Target appropriately.
+// Panics on error.
+func (o *User) AddTargetMessagesP(exec boil.Executor, insert bool, related ...*Message) {
+	if err := o.AddTargetMessages(exec, insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddTargetMessagesGP adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.TargetMessages.
+// Sets related.R.Target appropriately.
+// Uses the global database handle and panics on error.
+func (o *User) AddTargetMessagesGP(insert bool, related ...*Message) {
+	if err := o.AddTargetMessages(boil.GetDB(), insert, related...); err != nil {
+		panic(boil.WrapErr(err))
+	}
+}
+
+// AddTargetMessages adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.TargetMessages.
+// Sets related.R.Target appropriately.
+func (o *User) AddTargetMessages(exec boil.Executor, insert bool, related ...*Message) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			rel.TargetID = o.ID
+			if err = rel.Insert(exec); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"messages\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"target_id"}),
+				strmangle.WhereClause("\"", "\"", 2, messagePrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.DebugMode {
+				fmt.Fprintln(boil.DebugWriter, updateQuery)
+				fmt.Fprintln(boil.DebugWriter, values)
+			}
+
+			if _, err = exec.Exec(updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			rel.TargetID = o.ID
+		}
+	}
+
+	if o.R == nil {
+		o.R = &userR{
+			TargetMessages: related,
+		}
+	} else {
+		o.R.TargetMessages = append(o.R.TargetMessages, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &messageR{
+				Target: o,
+			}
+		} else {
+			rel.R.Target = o
+		}
+	}
 	return nil
 }
 

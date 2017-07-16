@@ -7,11 +7,13 @@ package models
 var TableNames = struct {
 	AuthTokens  string
 	Friendships string
+	Messages    string
 	RemoteUsers string
 	Users       string
 }{
 	AuthTokens:  "auth_tokens",
 	Friendships: "friendships",
+	Messages:    "messages",
 	RemoteUsers: "remote_users",
 	Users:       "users",
 }
