@@ -120,5 +120,5 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 		messages[left], messages[right] = messages[right], messages[left]
 	}
 
-	json.NewEncoder(w).Encode(JSON{"err": err, "msg": messages})
+	json.NewEncoder(w).Encode(messages)
 }
