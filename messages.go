@@ -95,6 +95,7 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 	timestampStr := r.URL.Query().Get("before")
 	if len(timestampStr) > 0 {
 		timestampInt, err := strconv.ParseInt(timestampStr, 10, 64)
+		timestampInt *= 1000000 // because javascript
 		if err != nil {
 			errorResponse(w, "Invalid time.", http.StatusUnprocessableEntity)
 			return
@@ -118,7 +119,7 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 		m := messages[i]
 		response = append(response, JSON{
 			"id":        m.ID,
-			"timestamp": m.CreatedAt.UnixNano(),
+			"timestamp": m.CreatedAt.UnixNano() / 1000000, // because javascript
 			"sender":    m.SenderID,
 			"target":    m.TargetID,
 			"message":   m.Content,
