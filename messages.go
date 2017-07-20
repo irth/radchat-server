@@ -65,7 +65,7 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.Hub.SendToUser(req.Target, JSON{"type": "message", "id": m.ID, "sender": u.ID, "message": req.Message})
+	a.Hub.SendToUser(req.Target, JSON{"type": "message", "id": m.ID, "timestamp": m.CreatedAt.UnixNano() / 1000000, "sender": u.ID, "message": req.Message})
 	json.NewEncoder(w).Encode(ResMessageSend{Success: true, ID: m.ID})
 }
 

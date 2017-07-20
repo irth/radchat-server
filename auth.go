@@ -45,6 +45,7 @@ func (a App) handleGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	if err == sql.ErrNoRows {
 		u = &models.User{
 			DisplayName: googleAuthToken.Name,
+			Status:      models.StatusUnavailable,
 		}
 
 		ru = &models.RemoteUser{RemoteID: fmt.Sprintf("google:%s", googleAuthToken.Subject)}
