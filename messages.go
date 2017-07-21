@@ -113,11 +113,11 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := []JSON{}
+	history := []JSON{}
 
 	for i := len(messages) - 1; i >= 0; i-- {
 		m := messages[i]
-		response = append(response, JSON{
+		history = append(history, JSON{
 			"id":        m.ID,
 			"timestamp": m.CreatedAt.UnixNano() / 1000000, // because javascript
 			"sender":    m.SenderID,
@@ -126,5 +126,5 @@ func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(JSON{"messages": history})
 }
