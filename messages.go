@@ -23,12 +23,6 @@ type ReqMessageSend struct {
 	Message string `json:"message"`
 }
 
-type ResMessageSend struct {
-	Success bool   `json:"success"`
-	ID      int    `json:"id,omitempty"`
-	Error   string `json:"error,omitempty"`
-}
-
 func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		errorResponse(w, "Not found", http.StatusNotFound)
@@ -43,6 +37,7 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 	u, err := a.verifyAuthToken(req.Token)
 	if err != nil {
 		errorResponse(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 
 	isFriend, err := u.FriendshipsG(qm.Where("friend_id=?", req.Target)).Exists()
@@ -64,9 +59,16 @@ func (a *App) handleSend(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, "Couldn't send the message", http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("done")
 
 	a.Hub.SendToUser(req.Target, JSON{"type": "message", "id": m.ID, "timestamp": m.CreatedAt.UnixNano() / 1000000, "sender": u.ID, "message": req.Message})
-	json.NewEncoder(w).Encode(ResMessageSend{Success: true, ID: m.ID})
+	json.NewEncoder(w).Encode(JSON{
+		"id":        m.ID,
+		"sender":    m.SenderID,
+		"target":    m.TargetID,
+		"timestamp": m.CreatedAt.UnixNano() / 100000,
+		"message":   m.Content,
+	})
 }
 
 func (a *App) handleHistory(w http.ResponseWriter, r *http.Request) {
